@@ -365,10 +365,11 @@ jobs:
             exit 0
           fi
 
-          # Далі вивід іде у файл на VM, а в лог CI — лише після відкату: якщо SSH-сесію вже
-          # розірвано, перший запис у неї вбив би скрипт (SIGPIPE) ще до відкату. Файл не
-          # відкрився — вивід лишається в SSH-сесії, а відкат усе одно виконується.
-          exec 3>&1
+          # До кінця відкату в SSH-сесію нічого не пишемо: якщо її вже розірвано, перший запис
+          # у неї вбив би скрипт (SIGPIPE) ще до відкату. Вивід іде у файл на VM, а в лог CI —
+          # лише після відкату. Файл не відкрився — вивід іде в /dev/null (і помилка відкриття
+          # теж), а відкат усе одно виконується.
+          exec 3>&1 >/dev/null 2>&1
           log=deploy-unhealthy.log
           exec >"$log" 2>&1 || log=
           echo "--- the new release is unhealthy, last logs:" >&2
@@ -383,7 +384,11 @@ jobs:
           else
             echo "--- no previous release on the VM: nothing to roll back to" >&2
           fi
-          [ -z "$log" ] || cat "$log" >&3
+          if [ -n "$log" ]; then
+            cat "$log" >&3
+          else
+            echo "--- could not write deploy-unhealthy.log: no logs from the VM; check docker compose ps there" >&3
+          fi
           exit 1
           REMOTE
           echo "Deployed \`$IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
