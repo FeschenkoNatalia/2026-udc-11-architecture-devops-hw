@@ -37,8 +37,10 @@ EXPOSE 8080
 # пулу і навмисно лишається 200 під піковим навантаженням (docs/postmortem.md, #5), щоб пік
 # не робив контейнер unhealthy, а реліз, викладений у пік, не відкочувався. Вичерпаний пул
 # v1.8.0 перевірка через пул і не зловила б: `up --wait` завершується на першому «healthy»,
-# ще до навантаження. Такий реліз зупиняють C5 у `npm run check:deploy` і алерт
-# ApiDbPoolWaiting (post-mortem #3, #4); перевірка готовності через пул — новий ендпоінт в app/.
+# ще до навантаження. Такий реліз зупиняє C5 у `npm run check:deploy`, лише якщо назва змінної
+# не збігається з тим, що читає app/src/config.js (post-mortem #3). Алерт ApiDbPoolWaiting
+# (post-mortem #4) лише сповіщає чергового після викладення і релізу не зупиняє. Перевірка
+# готовності через пул — новий ендпоінт в app/.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 8080) + '/health', { signal: AbortSignal.timeout(4000) }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 

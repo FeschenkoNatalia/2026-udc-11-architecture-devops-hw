@@ -322,6 +322,7 @@ test("C5: names read from the environment", () => {
   assert.deepEqual(read("const x = myenv.X + envy.Y;"), []);
   // …and so is settings.env.X, while a method called on env reads nothing
   assert.deepEqual(read("const s = settings.env.DB_POOL_SIZE + this.env?.Z; const t = process.env.T.trim();"), ["T"]);
+  assert.deepEqual(read("const s = settings . env.DB_POOL_SIZE + cfg\n  .env.Y; const u = process . env.U; function f() { return env.V; }"), ["U", "V"]);
   // presence checks
   assert.deepEqual(read('if ("A" in env || Object.hasOwn(process.env, "B") || Reflect.has(env, \'C\') || env.hasOwnProperty("D")) {}'), ["A", "B", "C", "D"]);
   // regex literals are skipped: their // is no comment, their quote opens no string…

@@ -349,7 +349,7 @@ jobs:
       - name: Start the new release (automatic rollback if unhealthy)
         run: |
           ssh -F "$RUNNER_TEMP/ssh/config" prod bash -s -- "$DEPLOY_PATH" <<'REMOTE' \
-            || { echo "::error::the new release did not become healthy; rolled back to the previous one if there was one (see the log above, or deploy-unhealthy.log in the deploy directory on the VM)"; exit 1; }
+            || { echo "::error::the deploy failed: the new release did not become healthy, or the deploy script itself failed; whether it rolled back is in the log above or in deploy-unhealthy.log in the deploy directory on the VM"; exit 1; }
           set -euo pipefail
           cd "$1"
           # Поточний реліз зберігаємо як *.prev — для автоматичного і ручного відкату.
@@ -366,8 +366,11 @@ jobs:
           fi
 
           # Далі вивід іде у файл на VM, а в лог CI — лише після відкату: якщо SSH-сесію вже
-          # розірвано, перший запис у неї вбив би скрипт (SIGPIPE) ще до відкату.
-          exec 3>&1 >deploy-unhealthy.log 2>&1
+          # розірвано, перший запис у неї вбив би скрипт (SIGPIPE) ще до відкату. Файл не
+          # відкрився — вивід лишається в SSH-сесії, а відкат усе одно виконується.
+          exec 3>&1
+          log=deploy-unhealthy.log
+          exec >"$log" 2>&1 || log=
           echo "--- the new release is unhealthy, last logs:" >&2
           docker compose logs --no-color --tail 100 api worker >&2 || true
           if [ -f .env.prev ]; then
@@ -375,9 +378,12 @@ jobs:
             cp -p .env.prev .env
             cp -p compose.yaml.prev compose.yaml
             docker compose up --detach --wait --wait-timeout 120 --remove-orphans \
+              && echo "--- rolled back: the previous release is healthy" >&2 \
               || echo "--- the previous release is not healthy either" >&2
+          else
+            echo "--- no previous release on the VM: nothing to roll back to" >&2
           fi
-          cat deploy-unhealthy.log >&3
+          [ -z "$log" ] || cat "$log" >&3
           exit 1
           REMOTE
           echo "Deployed \`$IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
