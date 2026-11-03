@@ -318,12 +318,19 @@ test("C5: names read from the environment", () => {
   assert.deepEqual(read(String.raw`log("say \"env.A\" twice"); const b = env.B;`), ["B"]); // an escaped quote does not end the string
   const helper = 'const need = (name) => { const v = env[name]; if (!v) throw new Error(`${name} is required`); return v; };\nneed("DB_POOL_MAX"); need(\'SMS_TOKEN\'); log("not a Name");';
   assert.deepEqual(read(helper), ["DB_POOL_MAX", "SMS_TOKEN"]);
+  assert.deepEqual(read('const v = process.env[name]; need("DB_POOL_MAX");'), ["DB_POOL_MAX"]);
+  // …but not when someone else's object or a private field is indexed
+  assert.deepEqual(read('const v = this.#env[name] ?? settings.env[key]; need("DB_POOL_SIZE");'), []);
   // `env` as a whole word only: myenv.X is someone else's object
   assert.deepEqual(read("const x = myenv.X + envy.Y;"), []);
   // …and so is settings.env.X, while a method called on env reads nothing
   assert.deepEqual(read("const s = settings.env.DB_POOL_SIZE + this.env?.Z; const t = process.env.T.trim();"), ["T"]);
   assert.deepEqual(read("const s = settings . env.DB_POOL_SIZE + cfg\n  .env.Y; const u = process . env.U; function f() { return env.V; }"), ["U", "V"]);
   assert.deepEqual(read('const s = settings.env["DB_POOL_SIZE"] + cfg . env?.["Y"] + settings.process.env["Z"];'), []);
+  // …and so is a private field #env
+  assert.deepEqual(read('const s = this.#env.DB_POOL_SIZE + this.#env["DB_POOL_MAX"];'), []);
+  assert.deepEqual(read('const s = settings.env.hasOwnProperty("A") + this.#env.hasOwnProperty("B");'), []);
+  assert.deepEqual(read('const s = process.env.hasOwnProperty("D");'), ["D"]);
   // …but the dots of a spread are no member access
   assert.deepEqual(read("const h = [...env.HOSTS, ... process.env.PEERS, ...settings.env.DB_POOL_SIZE];"), ["HOSTS", "PEERS"]);
   assert.deepEqual(read('const h = [...env["HOSTS"], ...process.env?.["PEERS"], ...settings.env["DB_POOL_SIZE"]];'), ["HOSTS", "PEERS"]);

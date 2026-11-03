@@ -471,14 +471,15 @@ export function envNamesRead(source) {
   const names = new Set();
   const ENV = String.raw`(?:process\s*\.\s*)?env\b`;
   const STR = "(\u0001\\d+\u0001)";
-  // env.NAME / process.env.NAME only: not settings.env.NAME or settings . env.NAME (someone else's object), not env.method();
-  // the last dot of a spread (...env.NAME) is no member access. The same for env["NAME"] below.
-  for (const m of code.matchAll(/(?<![\w$])(?<!(?<!\.)\.\s*)(?:process\s*\.\s*)?env\s*(?:\?\.|\.)\s*([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_]|\s*\()/g)) names.add(m[1]);
+  // env.NAME / process.env.NAME only: not settings.env.NAME or settings . env.NAME (someone else's object), not
+  // this.#env.NAME (a private field), not env.method(); the last dot of a spread (...env.NAME) is no member access.
+  // The same for env["NAME"] and env.hasOwnProperty("NAME") below.
+  for (const m of code.matchAll(/(?<![\w$#])(?<!(?<!\.)\.\s*)(?:process\s*\.\s*)?env\s*(?:\?\.|\.)\s*([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_]|\s*\()/g)) names.add(m[1]);
   for (const re of [
-    new RegExp(String.raw`(?<![\w$])(?<!(?<!\.)\.\s*)(?:process\s*\.\s*)?env\s*(?:\?\.)?\[\s*${STR}\s*\]`, "g"),
+    new RegExp(String.raw`(?<![\w$#])(?<!(?<!\.)\.\s*)(?:process\s*\.\s*)?env\s*(?:\?\.)?\[\s*${STR}\s*\]`, "g"),
     new RegExp(String.raw`${STR}\s+in\s+${ENV}`, "g"),
     new RegExp(String.raw`\b(?:Object\s*\.\s*hasOwn|Reflect\s*\.\s*has)\s*\(\s*${ENV}\s*,\s*${STR}`, "g"),
-    new RegExp(String.raw`\benv\s*\.\s*hasOwnProperty\s*\(\s*${STR}`, "g"),
+    new RegExp(String.raw`(?<![\w$#])(?<!(?<!\.)\.\s*)(?:process\s*\.\s*)?env\s*\.\s*hasOwnProperty\s*\(\s*${STR}`, "g"),
   ]) {
     for (const m of code.matchAll(re)) if (ENV_NAME.test(literal(m[1]))) names.add(literal(m[1]));
   }
@@ -488,7 +489,8 @@ export function envNamesRead(source) {
       if (!key.startsWith("...") && ENV_NAME.test(key)) names.add(key);
     }
   }
-  if (/\benv\s*(?:\?\.)?\[\s*[A-Za-z_$]/.test(code)) {
+  // env[name] / process.env[name] only, as above: not settings.env[name] or this.#env[name]
+  if (/(?<![\w$#])(?<!(?<!\.)\.\s*)(?:process\s*\.\s*)?env\s*(?:\?\.)?\[\s*[A-Za-z_$]/.test(code)) {
     for (const text of strings) if (/^[A-Z][A-Z0-9_]*$/.test(text)) names.add(text);
   }
   names.delete("");
