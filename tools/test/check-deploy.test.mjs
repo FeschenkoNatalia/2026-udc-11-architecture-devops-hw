@@ -319,6 +319,13 @@ test("C5: names read from the environment", () => {
   const helper = 'const need = (name) => { const v = env[name]; if (!v) throw new Error(`${name} is required`); return v; };\nneed("DB_POOL_MAX"); need(\'SMS_TOKEN\'); log("not a Name");';
   assert.deepEqual(read(helper), ["DB_POOL_MAX", "SMS_TOKEN"]);
   assert.deepEqual(read('const v = process.env[name]; need("DB_POOL_MAX");'), ["DB_POOL_MAX"]);
+  // a key in parentheses is the same access
+  assert.deepEqual(read('const v = env[(name)] ?? process.env?.[ ( key ) ]; need("DB_POOL_MAX");'), ["DB_POOL_MAX"]);
+  assert.deepEqual(read('const v = env[("DB_POOL_MAX")] ?? process.env[ ( "PORT" ) ];'), ["DB_POOL_MAX", "PORT"]);
+  // …and so is a key built from parts ("DB_" is a whole UPPER_CASE literal too), while one literal key is not
+  assert.deepEqual(read('const v = env["DB_" + name]; need("POOL_MAX");'), ["DB_", "POOL_MAX"]);
+  assert.deepEqual(read('const v = env[`${p}_URL`]; need("DB_POOL_MAX");'), ["DB_POOL_MAX"]);
+  assert.deepEqual(read('const v = env["PORT"] ?? env[ ( `HOST` ) ]; log("NOT_READ");'), ["HOST", "PORT"]);
   // …but not when someone else's object or a private field is indexed
   assert.deepEqual(read('const v = this.#env[name] ?? settings.env[key]; need("DB_POOL_SIZE");'), []);
   // `env` as a whole word only: myenv.X is someone else's object

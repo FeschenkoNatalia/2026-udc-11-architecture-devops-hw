@@ -133,10 +133,11 @@ dc() { (cd deploy && docker compose "$@"); }   # з теки deploy/, як зв�
      «Діагностиці».
 5. **Проба, яка справді йде через пул.** У нашому коді вона лише читає: шукає неіснуючу
    сесію (`app/src/db.js:55-57`), тому завжди закінчується `403`, якщо дочекалася
-   з'єднання.
+   з'єднання. `CHANGE_ME` залиште як є: сесії з таким id немає. З токеном персоналу
+   відповідь буде `200` зі списком посилок, а не `403`, як нижче.
 
    ```bash
-   for i in 1 2 3 4 5; do curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' -H 'Authorization: Bearer runbook-probe' http://localhost:8080/admin/parcels; done
+   for i in 1 2 3 4 5; do curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' -H 'Authorization: Bearer CHANGE_ME' http://localhost:8080/admin/parcels; done
    ```
 
    - `403` за < 0,5 с усі п'ять разів — пул і БД відповідають без черги.
