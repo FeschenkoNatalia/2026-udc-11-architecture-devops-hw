@@ -269,9 +269,15 @@ docker compose ps     # api — healthy, worker — running
 - **Припущення:** у локальному `compose.yaml` значення токена — у подвійних лапках і без
   символів `#`, `&`, `\`. Інакше `t` буде порожнім, і перевірка в блоці 3 покаже `NO TOKEN`.
 - **Повернення на `main`.** Після відкату VM у стані «detached HEAD», і звичайний
-  `git pull` не спрацює. Коли виправлення злите в `main`, поверніться так само:
-  `git stash push -m return`, `git checkout main && git pull`, рядки з `t=` і `sed` з
-  блоку 2, `dc up -d --build`, перевірка з блоку 3.
+  `git pull` не спрацює. Коли виправлення злите в `main`, спершу подивіться, який там
+  `compose.yaml`: `git fetch && git show origin/main:deploy/compose.yaml | grep -n SMS_TOKEN`.
+  - `SMS_TOKEN: "CHANGE_ME"` — поверніться так само: `git stash push -m return`,
+    `git checkout main && git pull`, рядки з `t=` і `sed` з блоку 2, `dc up -d --build`,
+    перевірка з блоку 3.
+  - `${SMS_TOKEN:?…}` — у `main` уже compose для pipeline: образ, токен і решту секретів він
+    бере з `.env`, тож `sed` нічого не замінить, а `dc up` без `.env` відмовиться стартувати.
+    Checkout не чіпайте: це вже перехід на pipeline (`pipeline/deploy.yml`, «Перехід»), і
+    `.env` на VM пише він.
 
 ## Ролі
 

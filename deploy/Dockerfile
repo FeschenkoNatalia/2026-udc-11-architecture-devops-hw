@@ -33,6 +33,12 @@ EXPOSE 8080
 # compose, щоб образ ніде не запускався без неї: і в smoke-тесті pipeline, і на VM, де за
 # нею `docker compose up --wait` вирішує, чи відкочувати реліз. Worker і нічна задача з
 # цього ж образу HTTP не слухають — compose.yaml вимикає для них цю перевірку явно.
+# Це перевірка «процес живий і відповідає», а не готовності БД: /health не бере з'єднання з
+# пулу і навмисно лишається 200 під піковим навантаженням (docs/postmortem.md, #5), щоб пік
+# не робив контейнер unhealthy, а реліз, викладений у пік, не відкочувався. Вичерпаний пул
+# v1.8.0 перевірка через пул і не зловила б: `up --wait` завершується на першому «healthy»,
+# ще до навантаження. Такий реліз зупиняють C5 у `npm run check:deploy` і алерт
+# ApiDbPoolWaiting (post-mortem #3, #4); перевірка готовності через пул — новий ендпоінт в app/.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 8080) + '/health', { signal: AbortSignal.timeout(4000) }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 

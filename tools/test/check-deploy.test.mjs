@@ -320,12 +320,15 @@ test("C5: names read from the environment", () => {
   assert.deepEqual(read(helper), ["DB_POOL_MAX", "SMS_TOKEN"]);
   // `env` as a whole word only: myenv.X is someone else's object
   assert.deepEqual(read("const x = myenv.X + envy.Y;"), []);
+  // …and so is settings.env.X, while a method called on env reads nothing
+  assert.deepEqual(read("const s = settings.env.DB_POOL_SIZE + this.env?.Z; const t = process.env.T.trim();"), ["T"]);
   // presence checks
-  assert.deepEqual(read('if ("A" in env || Object.hasOwn(process.env, "B") || Reflect.has(env, \'C\') || env.hasOwnProperty("D")) {}'), ["A", "B", "C", "D", "hasOwnProperty"]);
+  assert.deepEqual(read('if ("A" in env || Object.hasOwn(process.env, "B") || Reflect.has(env, \'C\') || env.hasOwnProperty("D")) {}'), ["A", "B", "C", "D"]);
   // regex literals are skipped: their // is no comment, their quote opens no string…
   assert.deepEqual(read(String.raw`const url = /^https?:\/\//.test(env.SMS_BASE_URL) ? env.SMS_BASE_URL : bad();`), ["SMS_BASE_URL"]);
   assert.deepEqual(read('const q = /["]/; const a = env.A; const m = "env.DB_POOL_SIZE was renamed";'), ["A"]);
   assert.deepEqual(read('const q = /[/"]/g; const b = env.B; const m = "x";'), ["B"]); // a / inside [...] does not end the regex
+  assert.deepEqual(read(String.raw`if (x) /https?:\/\//.test(u); const p = env.DB_POOL_MAX;`), ["DB_POOL_MAX"]); // after the ) of a condition
   // …while a / after a value is a division, not a regex
   assert.deepEqual(read("const half = env.X / 2 / (env.Y) / 3;"), ["X", "Y"]);
 });

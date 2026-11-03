@@ -378,10 +378,24 @@ export function imageProblem(image) {
 // A string literal's place in scanJs().code: \u0001<index into strings>\u0001.
 const LITERAL = /\u0001(\d+)\u0001/;
 
-/** A `/` starts a regex literal (not a division) at the start, after an operator, an opening bracket or a keyword. */
+/**
+ * A `/` starts a regex literal (not a division) at the start, after an operator, an opening bracket,
+ * a keyword or the `)` that closes the condition of an if, while or for.
+ */
 function regexCanStart(code) {
   const before = code.trimEnd();
+  if (before.endsWith(")")) return closesCondition(before);
   return before === "" || /(?:[(,=:[!&|?{};+\-*%<>~^]|\b(?:return|typeof|case|do|else|in|of|new|delete|void|throw|instanceof|yield|await))$/.test(before.slice(-12));
+}
+
+/** `code` ends with `)`: does it close the condition of an if, while or for? In `(a + b) / 2` it does not. */
+function closesCondition(code) {
+  let depth = 0;
+  for (let i = code.length - 1; i >= 0; i -= 1) {
+    if (code[i] === ")") depth += 1;
+    else if (code[i] === "(" && (depth -= 1) === 0) return /\b(?:if|while|for)\s*$/.test(code.slice(0, i));
+  }
+  return false;
 }
 
 /**
@@ -457,7 +471,8 @@ export function envNamesRead(source) {
   const names = new Set();
   const ENV = String.raw`(?:process\s*\.\s*)?env\b`;
   const STR = "(\u0001\\d+\u0001)";
-  for (const m of code.matchAll(/\benv\s*(?:\?\.|\.)\s*([A-Za-z_][A-Za-z0-9_]*)/g)) names.add(m[1]);
+  // env.NAME / process.env.NAME only: not settings.env.NAME (someone else's object), not env.method()
+  for (const m of code.matchAll(/(?<![\w$.])(?:process\s*\.\s*)?env\s*(?:\?\.|\.)\s*([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_]|\s*\()/g)) names.add(m[1]);
   for (const re of [
     new RegExp(String.raw`\benv\s*(?:\?\.)?\[\s*${STR}\s*\]`, "g"),
     new RegExp(String.raw`${STR}\s+in\s+${ENV}`, "g"),

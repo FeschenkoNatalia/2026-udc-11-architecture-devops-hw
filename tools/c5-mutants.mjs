@@ -5,8 +5,10 @@
 //
 // Each mutant replaces one whole line of check-deploy.mjs — found by a snippet that must occur
 // on exactly one line — in a temp copy of the repo, then runs the C5 tests there. A mutant is
-// "killed" when the tests go red. Not part of `npm run test:tools`: it lives outside tools/test/.
-// Exit code 1 if any mutant survives or a snippet no longer matches (update the list then).
+// "killed" only when a test assertion fails; a run that goes red otherwise (spawn error, signal,
+// a test that broke on something else — say, npx unavailable) is an ERROR, not a kill.
+// Not part of `npm run test:tools`: it lives outside tools/test/.
+// Exit code 1 if any mutant survives or errors, or a snippet no longer matches (update the list then).
 
 import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -90,10 +92,11 @@ for (const [name, [snippet, replacement]] of Object.entries(MUTANTS)) {
   const dir = copyRepo();
   try {
     writeFileSync(join(dir, "tools", "check-deploy.mjs"), lines.map((line, i) => (i === hits[0] ? replacement : line)).join("\n"));
-    const dead = runC5Tests(dir).status !== 0;
-    if (dead) killed += 1;
+    const r = runC5Tests(dir);
+    const verdict = r.error || r.signal ? "ERROR" : r.status === 0 ? "SURVIVED" : r.stdout.includes("ERR_ASSERTION") ? "killed" : "ERROR";
+    if (verdict === "killed") killed += 1;
     else bad += 1;
-    console.log(`${dead ? "killed  " : "SURVIVED"} ${name}`);
+    console.log(`${verdict.padEnd(8)} ${name}${verdict === "ERROR" ? `: ${r.error?.message ?? r.signal ?? "the tests failed without a failed assertion"}` : ""}`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
